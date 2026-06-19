@@ -183,7 +183,7 @@ function registerIpc(): void {
 
       const hits = rag.search(`${request.mode}\n${request.content}`, {
         sourceIds: request.sourceIds,
-        limit: 8
+        limit: 4
       });
       stream({ requestId: request.requestId, chatId: request.chatId, sources: hits });
 
@@ -200,10 +200,16 @@ function registerIpc(): void {
         .map((message) => ({ role: message.role as "user" | "assistant", content: message.content }));
 
       await llama.ensureReady();
+      stream({
+        requestId: request.requestId,
+        chatId: request.chatId,
+        status: "Local model is ready. Generating response..."
+      });
       const fullText = await streamLocalChatCompletion({
         endpoint: llama.endpoint,
-        config: db.getModelConfig(),
+        config: { ...db.getModelConfig(), maxTokens: Math.min(db.getModelConfig().maxTokens, 900) },
         messages: [{ role: "system", content: systemPrompt }, ...history],
+        onStatus: (status) => stream({ requestId: request.requestId, chatId: request.chatId, status }),
         onToken: (delta) => stream({ requestId: request.requestId, chatId: request.chatId, delta })
       });
 

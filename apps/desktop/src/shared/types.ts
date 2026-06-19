@@ -89,6 +89,7 @@ export interface ChatStreamEvent {
   requestId: string;
   chatId: string;
   delta?: string;
+  status?: string;
   done?: boolean;
   error?: string;
   sources?: KnowledgeHit[];

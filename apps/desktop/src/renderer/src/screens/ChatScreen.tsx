@@ -69,7 +69,9 @@ export function ChatScreen({
   const [activeRequestId, setActiveRequestId] = useState<string>();
   const activeRequestRef = useRef<string>();
   const [streamingText, setStreamingText] = useState("");
+  const [streamStatus, setStreamStatus] = useState("");
   const [streamSources, setStreamSources] = useState<ChatStreamEvent["sources"]>([]);
+  const messageListRef = useRef<HTMLDivElement | null>(null);
 
   const activeChat = useMemo(() => chats.find((chat) => chat.id === activeChatId), [activeChatId, chats]);
 
@@ -97,9 +99,11 @@ export function ChatScreen({
     return window.frontendAgent.chats.onStream((event) => {
       if (event.requestId !== activeRequestRef.current) return;
       if (event.sources) setStreamSources(event.sources);
+      if (typeof event.status === "string") setStreamStatus(event.status);
       if (event.delta) setStreamingText((text) => text + event.delta);
       if (event.error) {
         setStreamingText(event.error);
+        setStreamStatus("");
         setSending(false);
       }
       if (event.done) {
@@ -112,6 +116,16 @@ export function ChatScreen({
       }
     });
   }, [onRefresh]);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      messageListRef.current?.scrollTo({
+        top: messageListRef.current.scrollHeight,
+        behavior: "smooth"
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [messages.length, streamingText, streamStatus]);
 
   async function sendMessage() {
     const content = input.trim();
@@ -128,6 +142,7 @@ export function ChatScreen({
     setSending(true);
     setActiveRequestId(requestId);
     setStreamingText("");
+    setStreamStatus("Preparing local prompt and knowledge context...");
     setStreamSources([]);
     setMessages((items) => [
       ...items,
@@ -161,7 +176,7 @@ export function ChatScreen({
   }
 
   return (
-    <div className="grid h-full grid-cols-[286px_1fr_310px] overflow-hidden">
+    <div className="grid h-full min-h-0 grid-cols-[286px_minmax(0,1fr)_310px] overflow-hidden">
       <aside className="min-h-0 border-r border-white/10 bg-ink-900">
         <div className="flex h-14 items-center justify-between border-b border-white/10 px-3">
           <span className="text-sm font-semibold text-white">Chats</span>
@@ -187,7 +202,7 @@ export function ChatScreen({
         </div>
       </aside>
 
-      <section className="flex min-w-0 flex-col bg-ink-950">
+      <section className="flex min-h-0 min-w-0 flex-col bg-ink-950">
         <div className="flex h-14 shrink-0 items-center justify-between border-b border-white/10 px-4">
           <div className="min-w-0">
             <div className="truncate text-sm font-semibold text-white">{activeChat?.title || "New frontend chat"}</div>
@@ -208,7 +223,7 @@ export function ChatScreen({
           </select>
         </div>
 
-        <div className="app-scrollbar min-h-0 flex-1 overflow-auto px-5 py-5">
+        <div ref={messageListRef} className="app-scrollbar min-h-0 flex-1 overflow-auto px-5 py-4 pb-6">
           {!messages.length && !streamingText ? (
             <div className="mx-auto mt-16 max-w-2xl rounded-md border border-white/10 bg-ink-900 p-6 text-center">
               <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-md bg-fern/15 text-fern">
@@ -250,8 +265,13 @@ export function ChatScreen({
                   Assistant
                   {sending ? <span className="h-2 w-2 animate-pulse rounded-full bg-fern" /> : null}
                 </div>
+                {streamStatus && !streamingText ? (
+                  <div className="mb-3 rounded-md border border-brass/25 bg-brass/10 px-3 py-2 text-sm text-brass">
+                    {streamStatus}
+                  </div>
+                ) : null}
                 <MarkdownMessage
-                  content={streamingText || "Starting local model..."}
+                  content={streamingText || "Waiting for the first token from the local model..."}
                   sources={streamSources}
                   activeProjectId={activeProjectId}
                   onApplied={onRefresh}
@@ -261,9 +281,9 @@ export function ChatScreen({
           </div>
         </div>
 
-        <div className="shrink-0 border-t border-white/10 bg-ink-900 p-4">
+        <div className="shrink-0 border-t border-white/10 bg-ink-900/98 px-4 py-3 shadow-[0_-16px_45px_rgba(0,0,0,0.35)]">
           <div className="mx-auto max-w-4xl">
-            <div className="mb-3 flex flex-wrap gap-2">
+            <div className="mb-2 flex flex-wrap gap-2">
               <PromptButton
                 icon={CopyCheck}
                 label="Explain this code"
@@ -296,9 +316,9 @@ export function ChatScreen({
                 }
               />
             </div>
-            <div className="flex gap-3">
+            <div className="flex items-stretch gap-3">
               <textarea
-                className="app-scrollbar min-h-[86px] flex-1 resize-none rounded-md border border-white/10 bg-ink-950 px-3 py-3 text-sm leading-6 text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-fern/50"
+                className="app-scrollbar h-[68px] min-h-[68px] flex-1 resize-none rounded-md border border-white/10 bg-ink-950 px-3 py-2.5 text-sm leading-5 text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-fern/50"
                 placeholder="Ask for a component, landing page, responsive fix, Liquid section, Tailwind refactor, or UI review..."
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
@@ -306,7 +326,7 @@ export function ChatScreen({
                   if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) sendMessage().catch(console.error);
                 }}
               />
-              <Button variant="primary" className="h-[86px] w-24" onClick={() => sendMessage()} disabled={sending}>
+              <Button variant="primary" className="h-[68px] w-24 shrink-0" onClick={() => sendMessage()} disabled={sending}>
                 <Send className="h-4 w-4" />
                 Send
               </Button>

@@ -1,5 +1,6 @@
 node_modules/
 release/
+release-fix/
 .electron-cache/
 apps/desktop/dist/
 apps/desktop/.vite/

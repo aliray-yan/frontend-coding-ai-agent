@@ -185,6 +185,6 @@ function cloneRepo(repoUrl: string, target: string): Promise<void> {
 export function formatHitsForPrompt(hits: KnowledgeHit[]): string[] {
   return hits.map((hit, index) => {
     const label = `[${index + 1}] ${hit.sourceName} - ${sourceNameFromPath(hit.path)} (score ${hit.score.toFixed(2)})`;
-    return `${label}\n${hit.content}`;
+    return `${label}\n${hit.content.slice(0, 900)}`;
   });
 }
