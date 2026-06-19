@@ -169,6 +169,7 @@ function registerIpc(): void {
 
   ipcMain.handle("chats:list", () => db.listChats());
   ipcMain.handle("chats:create", (_event, mode: AssistantMode) => db.createChat(mode));
+  ipcMain.handle("chats:delete", (_event, chatId: string) => db.deleteChat(chatId));
   ipcMain.handle("chats:messages", (_event, chatId: string) => db.listMessages(chatId));
   ipcMain.handle("chats:send", async (event, request: ChatRequest) => {
     const sender = event.sender;

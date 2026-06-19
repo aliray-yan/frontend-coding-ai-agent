@@ -44,6 +44,7 @@ const api = {
   chats: {
     list: (): Promise<ChatSummary[]> => ipcRenderer.invoke("chats:list"),
     create: (mode: AssistantMode): Promise<ChatSummary> => ipcRenderer.invoke("chats:create", mode),
+    delete: (chatId: string): Promise<void> => ipcRenderer.invoke("chats:delete", chatId),
     messages: (chatId: string): Promise<ChatMessage[]> => ipcRenderer.invoke("chats:messages", chatId),
     send: (request: ChatRequest): Promise<ChatMessage> => ipcRenderer.invoke("chats:send", request),
     onStream: (callback: (event: ChatStreamEvent) => void) => {

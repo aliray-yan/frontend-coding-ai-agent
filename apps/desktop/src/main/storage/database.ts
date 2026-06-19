@@ -114,6 +114,12 @@ export class LocalDatabase {
     this.scheduleSave();
   }
 
+  deleteChat(chatId: string): void {
+    this.run("DELETE FROM messages WHERE chatId = ?", [chatId]);
+    this.run("DELETE FROM chats WHERE id = ?", [chatId]);
+    this.scheduleSave();
+  }
+
   listMessages(chatId: string): ChatMessage[] {
     return this.all<Record<string, string>>(
       "SELECT id, chatId, role, content, createdAt, sourcesJson FROM messages WHERE chatId = ? ORDER BY createdAt ASC",

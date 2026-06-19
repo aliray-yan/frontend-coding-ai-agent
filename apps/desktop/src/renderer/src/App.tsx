@@ -3,8 +3,12 @@ import {
   BrainCircuit,
   FolderOpen,
   Home,
+  Menu,
   MessageSquarePlus,
   MonitorCog,
+  Moon,
+  Sun,
+  X,
   Settings
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -46,6 +50,7 @@ export function App() {
   const [activeProjectId, setActiveProjectId] = useState<string>();
   const [prefillPrompt, setPrefillPrompt] = useState("");
   const [busy, setBusy] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
 
   const activeProject = useMemo(
     () => projects.find((project) => project.id === activeProjectId),
@@ -90,6 +95,23 @@ export function App() {
     return chat;
   }
 
+  async function deleteChat(chatId: string) {
+    await window.frontendAgent.chats.delete(chatId);
+    setChats((items) => {
+      const next = items.filter((chat) => chat.id !== chatId);
+      if (activeChatId === chatId) setActiveChatId(next[0]?.id);
+      return next;
+    });
+    await refresh();
+  }
+
+  async function toggleTheme() {
+    if (!settings) return;
+    const nextTheme = settings.theme === "light" ? "dark" : "light";
+    const next = await window.frontendAgent.settings.update({ theme: nextTheme });
+    setSettings(next);
+  }
+
   async function openProject() {
     const project = await window.frontendAgent.projects.openDialog();
     if (project) {
@@ -122,13 +144,17 @@ export function App() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-ink-950 text-zinc-100">
+      {navOpen ? (
       <aside className="flex w-[244px] shrink-0 flex-col border-r border-white/10 bg-ink-900">
         <div className="flex h-16 items-center gap-3 border-b border-white/10 px-4">
           <img className="h-10 w-10 rounded-md" src="./app-icon.png" alt="" />
-          <div>
+          <div className="min-w-0 flex-1">
             <div className="text-sm font-semibold text-white">Frontend Coding</div>
             <div className="text-xs text-zinc-400">AI Agent</div>
           </div>
+          <Button variant="ghost" className="h-8 px-2" onClick={() => setNavOpen(false)} title="Close navigation">
+            <X className="h-4 w-4" />
+          </Button>
         </div>
 
         <nav className="flex-1 space-y-1 px-3 py-4">
@@ -163,18 +189,28 @@ export function App() {
           </Button>
         </div>
       </aside>
+      ) : null}
 
       <main className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-16 shrink-0 items-center justify-between border-b border-white/10 bg-ink-950/95 px-5">
-          <div>
-            <div className="text-sm font-semibold text-white">Frontend Coding AI Agent</div>
-            <div className="text-xs text-zinc-400">
-              Local llama.cpp backend, GGUF models, local SQLite, offline RAG
+          <div className="flex min-w-0 items-center gap-3">
+            <Button variant="ghost" className="h-9 px-2" onClick={() => setNavOpen((value) => !value)} title="Open navigation">
+              <Menu className="h-5 w-5" />
+            </Button>
+            <img className="h-9 w-9 rounded-md" src="./app-icon.png" alt="" />
+            <div className="min-w-0">
+              <div className="truncate text-sm font-semibold text-white">Frontend Coding AI Agent</div>
+              <div className="truncate text-xs text-zinc-400">
+                Local llama.cpp backend, GGUF models, local SQLite, offline RAG
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-3">
             <StatusPill tone={modelTone}>{status?.model.message || "Checking model"}</StatusPill>
             <StatusPill tone={sources.length ? "good" : "warn"}>{sources.length} sources</StatusPill>
+            <Button variant="ghost" onClick={toggleTheme} title="Toggle theme">
+              {settings?.theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+            </Button>
             <Button variant="ghost" onClick={() => setScreen("settings")} title="Model settings">
               <MonitorCog className="h-4 w-4" />
             </Button>
@@ -209,6 +245,7 @@ export function App() {
               onSelectChat={setActiveChatId}
               onSelectProject={setActiveProjectId}
               onCreateChat={createChat}
+              onDeleteChat={deleteChat}
               onRefresh={refresh}
             />
           )}

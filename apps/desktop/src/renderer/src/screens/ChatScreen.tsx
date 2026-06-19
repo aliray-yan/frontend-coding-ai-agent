@@ -2,13 +2,14 @@ import {
   Bot,
   Code2,
   CopyCheck,
+  Database,
   Maximize2,
   MessageSquarePlus,
   Paintbrush,
-  PanelRight,
   Send,
+  SlidersHorizontal,
   Smartphone,
-  Sparkles
+  Trash2
 } from "lucide-react";
 import type { ElementType } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -23,7 +24,6 @@ import type {
 } from "../../../shared/types";
 import { Button } from "../components/Button";
 import { MarkdownMessage } from "../components/MarkdownMessage";
-import { StatusPill } from "../components/StatusPill";
 
 const MODES: Array<{ value: AssistantMode; label: string }> = [
   { value: "general", label: "General" },
@@ -47,6 +47,7 @@ export function ChatScreen({
   onSelectChat,
   onSelectProject,
   onCreateChat,
+  onDeleteChat,
   onRefresh
 }: {
   chats: ChatSummary[];
@@ -59,12 +60,14 @@ export function ChatScreen({
   onSelectChat: (chatId: string) => void;
   onSelectProject: (projectId: string | undefined) => void;
   onCreateChat: (mode: AssistantMode) => Promise<ChatSummary>;
+  onDeleteChat: (chatId: string) => Promise<void>;
   onRefresh: () => Promise<void>;
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [mode, setMode] = useState<AssistantMode>("general");
   const [input, setInput] = useState("");
-  const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
+  const [uncheckedSourceIds, setUncheckedSourceIds] = useState<string[]>([]);
+  const [sourcePanelOpen, setSourcePanelOpen] = useState(false);
   const [sending, setSending] = useState(false);
   const [activeRequestId, setActiveRequestId] = useState<string>();
   const activeRequestRef = useRef<string>();
@@ -74,6 +77,10 @@ export function ChatScreen({
   const messageListRef = useRef<HTMLDivElement | null>(null);
 
   const activeChat = useMemo(() => chats.find((chat) => chat.id === activeChatId), [activeChatId, chats]);
+  const selectedSourceIds = useMemo(
+    () => sources.filter((source) => !uncheckedSourceIds.includes(source.id)).map((source) => source.id),
+    [sources, uncheckedSourceIds]
+  );
 
   useEffect(() => {
     if (!activeChatId) {
@@ -161,7 +168,12 @@ export function ChatScreen({
         chatId,
         content,
         mode,
-        sourceIds: selectedSourceIds.length ? selectedSourceIds : undefined,
+        sourceIds:
+          selectedSourceIds.length === sources.length
+            ? undefined
+            : selectedSourceIds.length
+              ? selectedSourceIds
+              : ["__no_sources__"],
         projectId: activeProjectId
       });
     } catch (error) {
@@ -176,7 +188,7 @@ export function ChatScreen({
   }
 
   return (
-    <div className="grid h-full min-h-0 grid-cols-[286px_minmax(0,1fr)_310px] overflow-hidden">
+    <div className="grid h-full min-h-0 grid-cols-[320px_minmax(0,1fr)] overflow-hidden">
       <aside className="min-h-0 border-r border-white/10 bg-ink-900">
         <div className="flex h-14 items-center justify-between border-b border-white/10 px-3">
           <span className="text-sm font-semibold text-white">Chats</span>
@@ -186,17 +198,28 @@ export function ChatScreen({
         </div>
         <div className="app-scrollbar h-[calc(100%-3.5rem)] overflow-auto p-2">
           {chats.map((chat) => (
-            <button
+            <div
               key={chat.id}
               className={clsx(
-                "mb-1 w-full rounded-md px-3 py-3 text-left transition",
+                "group mb-1 flex items-center gap-2 rounded-md pr-2 transition",
                 chat.id === activeChatId ? "bg-fern/15 text-fern" : "text-zinc-300 hover:bg-white/[0.06]"
               )}
-              onClick={() => onSelectChat(chat.id)}
             >
-              <div className="truncate text-sm font-medium">{chat.title}</div>
-              <div className="mt-1 text-xs text-zinc-500">{chat.mode}</div>
-            </button>
+              <button className="min-w-0 flex-1 px-3 py-3 text-left" onClick={() => onSelectChat(chat.id)}>
+                <div className="truncate text-sm font-medium">{chat.title}</div>
+                <div className="mt-1 text-xs text-zinc-500">{chat.mode}</div>
+              </button>
+              <Button
+                variant="ghost"
+                className="h-8 px-2 opacity-70 hover:text-coral group-hover:opacity-100"
+                title="Delete chat"
+                onClick={() => {
+                  if (window.confirm(`Delete "${chat.title}"?`)) onDeleteChat(chat.id).catch(console.error);
+                }}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
           ))}
           {!chats.length && <div className="p-4 text-sm text-zinc-500">No chats saved yet.</div>}
         </div>
@@ -210,17 +233,77 @@ export function ChatScreen({
               {activeProjectId ? "Project context attached" : "No project context attached"}
             </div>
           </div>
-          <select
-            className="h-9 rounded-md border border-white/10 bg-ink-850 px-3 text-sm text-zinc-100 outline-none focus:border-fern/50"
-            value={mode}
-            onChange={(event) => setMode(event.target.value as AssistantMode)}
-          >
-            {MODES.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </select>
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <Button variant="secondary" onClick={() => setSourcePanelOpen((value) => !value)}>
+                <SlidersHorizontal className="h-4 w-4" />
+                Context {selectedSourceIds.length}/{sources.length || 0}
+              </Button>
+              {sourcePanelOpen ? (
+                <div className="absolute right-0 top-11 z-50 w-[340px] rounded-md border border-white/10 bg-ink-900 p-4 shadow-soft">
+                  <label className="mb-2 block text-xs font-medium uppercase text-zinc-500">Project</label>
+                  <select
+                    className="mb-4 h-10 w-full rounded-md border border-white/10 bg-ink-850 px-3 text-sm text-zinc-100 outline-none focus:border-fern/50"
+                    value={activeProjectId || ""}
+                    onChange={(event) => onSelectProject(event.target.value || undefined)}
+                  >
+                    <option value="">No project</option>
+                    {projects.map((project) => (
+                      <option key={project.id} value={project.id}>
+                        {project.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase text-zinc-500">
+                    <Database className="h-4 w-4" />
+                    Knowledge Sources
+                  </div>
+                  <div className="space-y-2">
+                    {sources.map((source) => {
+                      const checked = !uncheckedSourceIds.includes(source.id);
+                      return (
+                        <label
+                          key={source.id}
+                          className="flex cursor-pointer items-center gap-3 rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-sm hover:bg-white/[0.07]"
+                        >
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 accent-fern"
+                            checked={checked}
+                            onChange={(event) => {
+                              setUncheckedSourceIds((items) =>
+                                event.target.checked
+                                  ? items.filter((id) => id !== source.id)
+                                  : [...new Set([...items, source.id])]
+                              );
+                            }}
+                          />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-zinc-200">{source.name}</span>
+                            <span className="text-xs text-zinc-500">{source.chunkCount} chunks</span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                    {!sources.length ? <div className="text-sm text-zinc-500">No indexed sources yet.</div> : null}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
+            <select
+              className="h-9 rounded-md border border-white/10 bg-ink-850 px-3 text-sm text-zinc-100 outline-none focus:border-fern/50"
+              value={mode}
+              onChange={(event) => setMode(event.target.value as AssistantMode)}
+            >
+              {MODES.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div ref={messageListRef} className="app-scrollbar min-h-0 flex-1 overflow-auto px-5 py-4 pb-6">
@@ -335,73 +418,6 @@ export function ChatScreen({
         </div>
       </section>
 
-      <aside className="min-h-0 border-l border-white/10 bg-ink-900">
-        <div className="flex h-14 items-center gap-2 border-b border-white/10 px-4">
-          <PanelRight className="h-4 w-4 text-zinc-500" />
-          <span className="text-sm font-semibold text-white">Context</span>
-        </div>
-        <div className="app-scrollbar h-[calc(100%-3.5rem)] overflow-auto p-4">
-          <div className="mb-5">
-            <label className="mb-2 block text-xs font-medium uppercase text-zinc-500">Project</label>
-            <select
-              className="h-10 w-full rounded-md border border-white/10 bg-ink-850 px-3 text-sm text-zinc-100 outline-none focus:border-fern/50"
-              value={activeProjectId || ""}
-              onChange={(event) => onSelectProject(event.target.value || undefined)}
-            >
-              <option value="">No project</option>
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="mb-5">
-            <div className="mb-2 flex items-center justify-between">
-              <label className="text-xs font-medium uppercase text-zinc-500">Knowledge Sources</label>
-              <StatusPill tone={selectedSourceIds.length ? "neutral" : "good"}>
-                {selectedSourceIds.length ? selectedSourceIds.length : "All"}
-              </StatusPill>
-            </div>
-            <div className="space-y-2">
-              {sources.map((source) => (
-                <label
-                  key={source.id}
-                  className="flex cursor-pointer items-center gap-3 rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-sm hover:bg-white/[0.07]"
-                >
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 accent-fern"
-                    checked={selectedSourceIds.includes(source.id)}
-                    onChange={(event) => {
-                      setSelectedSourceIds((items) =>
-                        event.target.checked ? [...items, source.id] : items.filter((id) => id !== source.id)
-                      );
-                    }}
-                  />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-zinc-200">{source.name}</span>
-                    <span className="text-xs text-zinc-500">{source.chunkCount} chunks</span>
-                  </span>
-                </label>
-              ))}
-              {!sources.length && <div className="text-sm text-zinc-500">No indexed sources yet.</div>}
-            </div>
-          </div>
-
-          <div className="rounded-md border border-white/10 bg-white/[0.04] p-3">
-            <div className="mb-2 flex items-center gap-2 text-sm font-medium text-white">
-              <Sparkles className="h-4 w-4 text-brass" />
-              Local-only policy
-            </div>
-            <p className="text-xs leading-5 text-zinc-500">
-              Chat prompts, code, project files, embeddings, and responses stay on this machine. The chat path only
-              connects to the local llama.cpp endpoint.
-            </p>
-          </div>
-        </div>
-      </aside>
     </div>
   );
 }
