@@ -1,0 +1,120 @@
+{
+  "name": "frontend-coding-ai-agent",
+  "version": "0.1.0",
+  "description": "Offline desktop AI assistant for frontend development using local llama.cpp GGUF models and a local RAG knowledge base.",
+  "author": "Local",
+  "license": "MIT",
+  "private": true,
+  "main": "apps/desktop/dist/main/index.js",
+  "scripts": {
+    "dev": "concurrently -k \"npm:dev:renderer\" \"npm:dev:main\" \"npm:dev:electron\"",
+    "dev:renderer": "vite --config apps/desktop/vite.config.ts --host 127.0.0.1",
+    "dev:main": "tsup apps/desktop/src/main/index.ts apps/desktop/src/main/preload.ts --format cjs --platform node --external electron --external sql.js --sourcemap --out-dir apps/desktop/dist/main --watch",
+    "dev:electron": "wait-on apps/desktop/dist/main/index.js http://127.0.0.1:5173 && cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron .",
+    "build": "npm run build:renderer && npm run build:main",
+    "build:renderer": "vite build --config apps/desktop/vite.config.ts",
+    "build:main": "tsup apps/desktop/src/main/index.ts apps/desktop/src/main/preload.ts --format cjs --platform node --external electron --external sql.js --sourcemap --out-dir apps/desktop/dist/main",
+    "package:win": "npm run build && cross-env ELECTRON_CACHE=.electron-cache CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win portable nsis",
+    "import:uiux": "tsx scripts/import-ui-ux-pro-max.ts",
+    "import:docs": "tsx scripts/import-docs.ts",
+    "build:index": "tsx scripts/build-index.ts",
+    "check:llama": "tsx scripts/check-llama.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^4.4.1",
+    "clsx": "^2.1.1",
+    "electron-store": "^10.1.0",
+    "lucide-react": "^0.468.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-markdown": "^9.0.1",
+    "remark-gfm": "^4.0.0",
+    "sql.js": "^1.12.0",
+    "uuid": "^10.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@types/uuid": "^10.0.0",
+    "autoprefixer": "^10.4.20",
+    "concurrently": "^9.1.0",
+    "cross-env": "^7.0.3",
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8",
+    "postcss": "^8.4.49",
+    "rcedit": "^5.0.2",
+    "tailwindcss": "^3.4.17",
+    "tsup": "^8.3.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.5",
+    "wait-on": "^8.0.1"
+  },
+  "build": {
+    "appId": "local.frontend-coding-ai-agent",
+    "productName": "Frontend Coding AI Agent",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "apps/desktop/dist/**/*",
+      "apps/desktop/package-assets/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "build/icon.ico",
+        "to": "build/icon.ico"
+      },
+      {
+        "from": "vendor/llama.cpp",
+        "to": "vendor/llama.cpp",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "docs/frontend-docs",
+        "to": "docs/frontend-docs",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "examples/templates",
+        "to": "examples/templates",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "asarUnpack": [
+      "node_modules/sql.js/dist/sql-wasm.wasm",
+      "vendor/llama.cpp/**/*"
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "signAndEditExecutable": false,
+      "target": [
+        "portable",
+        "nsis"
+      ]
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-${arch}-portable.${ext}"
+    },
+    "afterPack": "build/afterPack.cjs",
+    "nsis": {
+      "artifactName": "${productName}-${version}-${arch}-setup.${ext}",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
+      "shortcutName": "Frontend Coding AI Agent",
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}
